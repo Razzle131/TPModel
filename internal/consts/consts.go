@@ -3,8 +3,8 @@ package consts
 // емкость баков
 const (
 	CapTank0 = 100
-	CapTank1 = 100
-	CapTank2 = 100
+	CapTank1 = 10000
+	CapTank2 = 10000
 )
 
 // производительность клапанов

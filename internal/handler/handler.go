@@ -100,3 +100,19 @@ func (s *Server) GetTank(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(bytes)
 }
+
+func (s *Server) GetValve(w http.ResponseWriter, r *http.Request) {
+	valveName := r.PathValue(valveNameKey)
+
+	valve, err := s.service.GetValveByName(r.Context(), valveName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	bytes, _ := json.Marshal(valve)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(bytes)
+}

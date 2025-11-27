@@ -178,3 +178,13 @@ func (s *Service) GetTankByName(ctx context.Context, tankName string) (models.Ta
 
 	return tank, nil
 }
+
+func (s *Service) GetValveByName(ctx context.Context, valveName string) (models.Valve, error) {
+	valve, err := s.valveRepo.GetValveByName(ctx, valveName)
+	if err != nil {
+		slog.Error(fmt.Sprintf("service get valve with name %s: %s", valveName, err.Error()))
+		return models.Valve{}, fmt.Errorf("service get valve: %s", err.Error())
+	}
+
+	return valve, nil
+}
