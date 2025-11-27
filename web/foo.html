@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Система управления</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body {
+        font-family: Arial;
+        background: #eef2f5;
+        margin: 20px;
+    }
+    #scheme-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    #scheme {
+        width: 600px;
+        border: 1px solid #aaa;
+    }
+    .indicator {
+        position: absolute;
+        padding: 2px 6px;
+        background: #ccc;
+        border: 1px solid #666;
+        border-radius: 4px;
+        font-size: 12px;
+        transition: background 0.2s;
+    }
+    .indicator.active {
+        background: #19d219;
+        color: white;
+        font-weight: bold;
+    }
+
+    .controls {
+        margin-top: 20px;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid #aaa;
+        border-radius: 8px;
+        width: 600px;
+    }
+    button {
+        margin: 5px;
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+
+    .tank-status {
+        margin-top: 10px;
+        font-size: 18px;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<div id="scheme-wrapper">
+    <img id="scheme" src="scheme.png">
+
+    <!-- Датчики -->
+    <div id="du0" class="indicator" style="left: 270px; top: 645px;">ДУ0</div>
+    <div id="du1" class="indicator" style="left: 270px; top: 490px;">ДУ1</div>
+    <div id="du2" class="indicator" style="left: 270px; top: 340px;">ДУ2</div>
+
+    <div id="db1" class="indicator" style="left: 420px; top: 80px;">ДБ1</div>
+    <div id="db2" class="indicator" style="left: 420px; top: 220px;">ДБ2</div>
+
+    <div id="drp" class="indicator" style="left: 180px; top: 120px;">ДРП</div>
+
+    <!-- Клапаны -->
+    <div id="kl1" class="indicator" style="left: 250px; top: 10px;">КЛ1</div>
+    <div id="kl2" class="indicator" style="left: 250px; top: 140px;">КЛ2</div>
+    <div id="kl3" class="indicator" style="left: 50px; top: 720px;">КЛ3</div>
+    <div id="kl0" class="indicator" style="left: 170px; top: 720px;">КЛ0</div>
+</div>
+
+<div class="tank-status">
+    Бак0: <span id="tank0vol">...</span><br>
+    Бак1: <span id="tank1vol">...</span><br>
+    Бак2: <span id="tank2vol">...</span>
+</div>
+
+<div class="controls">
+    <h3>Управление</h3>
+
+    <button onclick="openValve('Кл0')">Открыть КЛ0</button>
+    <button onclick="closeValve('Кл0')">Закрыть КЛ0</button><br>
+
+    <button onclick="openValve('Кл1')">Открыть КЛ1</button>
+    <button onclick="closeValve('Кл1')">Закрыть КЛ1</button><br>
+
+    <button onclick="openValve('Кл2')">Открыть КЛ2</button>
+    <button onclick="closeValve('Кл2')">Закрыть КЛ2</button><br>
+
+    <button onclick="openValve('Кл3')">Открыть КЛ3</button>
+    <button onclick="closeValve('Кл3')">Закрыть КЛ3</button><br>
+
+    <button onclick="toggleRotor()">Переключить мешалку</button>
+</div>
+
+<script>
+const API = "http://localhost:8080";
+
+/* ---- API wrappers ---- */
+async function getJSON(url) {
+    const r = await fetch(url);
+    return r.json();
+}
+async function getSensor(name) {
+    return getJSON(`${API}/sensor/${name}`);
+}
+async function getTank(name) {
+    return getJSON(`${API}/tank/${name}`);
+}
+async function getValve(name) {
+    return getJSON(`${API}/valve/${name}`);
+}
+async function post(url) {
+    await fetch(url, {method: "POST"});
+}
+function openValve(v) { post(`${API}/valve/open/${v}`); }
+function closeValve(v) { post(`${API}/valve/close/${v}`); }
+function toggleRotor() { post(`${API}/drp`); }
+
+/* ---- Mapping of elements to their DOM IDs ---- */
+
+const indicators = {
+    "ДУ0": "du0",
+    "ДУ1": "du1",
+    "ДУ2": "du2",
+    "ДБ1": "db1",
+    "ДБ2": "db2",
+    "ДРП": "drp",
+    "Кл0": "kl0",
+    "Кл1": "kl1",
+    "Кл2": "kl2",
+    "Кл3": "kl3"
+};
+
+/* ---- Automatic update loop ---- */
+async function update() {
+    try {
+        // Update sensors
+        for (const s of ["ДУ0","ДУ1","ДУ2","ДБ1","ДБ2","ДРП"]) {
+            const data = await getSensor(s);
+            const el = document.getElementById(indicators[s]);
+            if (data.Value) el.classList.add("active");
+            else el.classList.remove("active");
+        }
+
+        // Update valves (API gives state indirectly — need to read sensor?)
+        // For demo: mark valve active if its corresponding sensor is active
+
+        const valveMap = {
+            "Кл0": "Кл0",
+            "Кл1": "Кл1",
+            "Кл2": "Кл2",
+            "Кл3": "Кл3"
+        };
+
+        for (const v of Object.keys(valveMap)) {
+            const sensor = await getValve(valveMap[v]);
+            const el = document.getElementById(indicators[v]);
+            if (sensor.IsOpen) el.classList.add("active");
+            else el.classList.remove("active");
+        }
+
+        // Tanks
+        const t0 = await getTank("Бак0");
+        const t1 = await getTank("Бак1");
+        const t2 = await getTank("Бак2");
+
+        document.getElementById("tank0vol").textContent =
+            `${t0.CurVolume} / ${t0.MaxVolume}`;
+        document.getElementById("tank1vol").textContent =
+            `${t1.CurVolume} / ${t1.MaxVolume}`;
+        document.getElementById("tank2vol").textContent =
+            `${t2.CurVolume} / ${t2.MaxVolume}`;
+    }
+    catch (e) {
+        console.log("Ошибка:", e);
+    }
+
+    setTimeout(update, 300);
+}
+
+update();
+</script>
+
+</body>
+</html>
